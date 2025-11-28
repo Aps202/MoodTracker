@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.abc.moodtracker.data.MoodEntry
+import com.abc.moodtracker.ui.AppTheme
 import com.abc.moodtracker.ui.getMoodTextColor
 import com.abc.moodtracker.ui.getMoodEmoji
 import androidx.compose.foundation.clickable
@@ -23,18 +24,10 @@ fun MoodHistory(
     onNavigateToDetail: (Long) -> Unit,
     onDeleteEntry: (MoodEntry) -> Unit,
     modifier: Modifier = Modifier,
-    isDarkTheme: Boolean
+    isDarkTheme: Boolean,
+    currentTheme: AppTheme = AppTheme.SYSTEM
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = "Mood History",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 8.dp),
-            color = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
         if (moodEntries.isEmpty()) {
             EmptyHistoryState(isDarkTheme = isDarkTheme)
         } else {
@@ -47,7 +40,8 @@ fun MoodHistory(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        isDarkTheme = isDarkTheme
+                        isDarkTheme = isDarkTheme,
+                        currentTheme = currentTheme
                     )
                 }
             }
@@ -55,14 +49,14 @@ fun MoodHistory(
     }
 }
 
-// Enhanced Mood Entry Item with delete button
 @Composable
 fun EnhancedMoodEntryItem(
     moodEntry: MoodEntry,
     onDelete: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    isDarkTheme: Boolean
+    isDarkTheme: Boolean,
+    currentTheme: AppTheme = AppTheme.SYSTEM
 ) {
     val surfaceVariantColor = if (isDarkTheme) Color(0xFF2D2D2D) else MaterialTheme.colorScheme.surfaceVariant
     val onSurfaceVariantColor = if (isDarkTheme) Color(0xFFB0B0B0) else MaterialTheme.colorScheme.onSurfaceVariant
@@ -96,9 +90,10 @@ fun EnhancedMoodEntryItem(
                     Text(
                         text = text,
                         style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = getMoodTextColor(moodEntry.mood, isDarkTheme, currentTheme)
                         ),
-                        color = getMoodTextColor(moodEntry.mood, isDarkTheme)
+                        modifier = Modifier.padding(bottom = 2.dp)
                     )
                     Text(
                         text = moodEntry.timestamp,

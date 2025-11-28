@@ -6,7 +6,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -19,63 +19,69 @@ import com.abc.moodtracker.viewmodel.MoodViewModelFactory
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Add this import
-import androidx.compose.foundation.background
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeeklyReportScreen(
     onNavigateBack: () -> Unit,
     viewModelFactory: MoodViewModelFactory,
-    isDarkTheme: Boolean
+    isDarkTheme: Boolean,
+    currentTheme: AppTheme = AppTheme.SYSTEM
 ) {
     val viewModel: MoodViewModel = viewModel(factory = viewModelFactory)
-    val backgroundColor = if (isDarkTheme) Color(0xFF121212) else MaterialTheme.colorScheme.background
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Weekly Report",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Add animated background
+        AnimatedMoodBackground(
+            isDarkTheme = isDarkTheme,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "Weekly Report",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold
+                            )
                         )
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.ArrowBack, "Back")
+                        }
                     }
+                )
+            },
+            containerColor = Color.Transparent
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                if (viewModel.isLoading.value) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    WeeklyStatsSection(viewModel.moodEntries.value, isDarkTheme, currentTheme)
+                    MoodFrequencyChart(viewModel.moodEntries.value, isDarkTheme, currentTheme)
+                    MoodDistributionSection(viewModel.moodEntries.value, isDarkTheme, currentTheme)
+                    MostFrequentMoodSection(viewModel.moodEntries.value, isDarkTheme, currentTheme)
                 }
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(backgroundColor)
-                .verticalScroll(rememberScrollState())
-        ) {
-            if (viewModel.isLoading.value) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                WeeklyStatsSection(viewModel.moodEntries.value, isDarkTheme)
-                MoodFrequencyChart(viewModel.moodEntries.value, isDarkTheme)
-                MoodDistributionSection(viewModel.moodEntries.value, isDarkTheme)
             }
         }
     }
 }
 
 @Composable
-fun WeeklyStatsSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
+fun WeeklyStatsSection(entries: List<MoodEntry>, isDarkTheme: Boolean, currentTheme: AppTheme = AppTheme.SYSTEM) {
     val weeklyData = calculateWeeklyMoodData(entries)
 
     Card(
@@ -83,7 +89,7 @@ fun WeeklyStatsSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
             .fillMaxWidth()
             .padding(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDarkTheme) Color(0xFF2D2D2D) else MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
         )
     ) {
         Column(
@@ -93,7 +99,7 @@ fun WeeklyStatsSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
                 text = "Weekly Statistics",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -103,16 +109,16 @@ fun WeeklyStatsSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                StatItem("Total", weeklyData.totalEntries.toString(), isDarkTheme)
-                StatItem("Trend", weeklyData.moodTrend, isDarkTheme)
-                StatItem("Avg/Day", "%.1f".format(weeklyData.averageMood), isDarkTheme)
+                StatItem("Total", weeklyData.totalEntries.toString(), isDarkTheme, currentTheme)
+                StatItem("Trend", weeklyData.moodTrend, isDarkTheme, currentTheme)
+                StatItem("Avg/Day", "%.1f".format(weeklyData.averageMood), isDarkTheme, currentTheme)
             }
         }
     }
 }
 
 @Composable
-fun StatItem(label: String, value: String, isDarkTheme: Boolean) {
+fun StatItem(label: String, value: String, isDarkTheme: Boolean, currentTheme: AppTheme = AppTheme.SYSTEM) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -125,14 +131,13 @@ fun StatItem(label: String, value: String, isDarkTheme: Boolean) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = if (isDarkTheme) Color(0xFFB0B0B0) else MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
 @Composable
-fun MoodFrequencyChart(entries: List<MoodEntry>, isDarkTheme: Boolean) {
-    val weeklyData = calculateWeeklyMoodData(entries)
+fun MoodFrequencyChart(entries: List<MoodEntry>, isDarkTheme: Boolean, currentTheme: AppTheme = AppTheme.SYSTEM) {
     val moodFrequency = calculateMoodFrequency(entries)
 
     Card(
@@ -140,7 +145,7 @@ fun MoodFrequencyChart(entries: List<MoodEntry>, isDarkTheme: Boolean) {
             .fillMaxWidth()
             .padding(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDarkTheme) Color(0xFF2D2D2D) else MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
         )
     ) {
         Column(
@@ -150,13 +155,13 @@ fun MoodFrequencyChart(entries: List<MoodEntry>, isDarkTheme: Boolean) {
                 text = "Mood Frequency (Last 7 Days)",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             if (moodFrequency.isNotEmpty()) {
-                // VERTICAL BARS - Changed from horizontal
+                // VERTICAL BARS
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -169,7 +174,8 @@ fun MoodFrequencyChart(entries: List<MoodEntry>, isDarkTheme: Boolean) {
                             mood = mood,
                             frequency = frequency,
                             maxFrequency = moodFrequency.values.maxOrNull() ?: 1,
-                            isDarkTheme = isDarkTheme
+                            isDarkTheme = isDarkTheme,
+                            currentTheme = currentTheme
                         )
                     }
                 }
@@ -185,7 +191,7 @@ fun MoodFrequencyChart(entries: List<MoodEntry>, isDarkTheme: Boolean) {
                         Text(
                             text = emoji,
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -193,7 +199,7 @@ fun MoodFrequencyChart(entries: List<MoodEntry>, isDarkTheme: Boolean) {
                 Text(
                     text = "No mood data available for chart",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isDarkTheme) Color(0xFFB0B0B0) else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -201,8 +207,14 @@ fun MoodFrequencyChart(entries: List<MoodEntry>, isDarkTheme: Boolean) {
 }
 
 @Composable
-fun VerticalMoodBar(mood: String, frequency: Int, maxFrequency: Int, isDarkTheme: Boolean) {
-    val barColor = getMoodColor(mood, isDarkTheme)
+fun VerticalMoodBar(
+    mood: String,
+    frequency: Int,
+    maxFrequency: Int,
+    isDarkTheme: Boolean,
+    currentTheme: AppTheme = AppTheme.SYSTEM
+) {
+    val barColor = getMoodColor(mood, isDarkTheme, currentTheme)
     val barHeight = if (maxFrequency > 0) (frequency.toFloat() / maxFrequency.toFloat()) * 0.8f else 0f
 
     Column(
@@ -215,38 +227,39 @@ fun VerticalMoodBar(mood: String, frequency: Int, maxFrequency: Int, isDarkTheme
             text = frequency.toString(),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 4.dp)
         )
 
         // Vertical bar
-        Box(
+        Card(
             modifier = Modifier
                 .width(30.dp)
-                .fillMaxHeight(barHeight)
-                .background(
-                    color = barColor,
-                    shape = MaterialTheme.shapes.small
-                )
+                .fillMaxHeight(barHeight),
+            colors = CardDefaults.cardColors(containerColor = barColor),
+            shape = MaterialTheme.shapes.small
         ) {
             // Percentage text inside bar (if there's enough space)
             if (barHeight > 0.3f) {
-                Text(
-                    text = "${(barHeight * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 4.dp)
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    Text(
+                        text = "${(barHeight * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun MoodDistributionSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
+fun MoodDistributionSection(entries: List<MoodEntry>, isDarkTheme: Boolean, currentTheme: AppTheme = AppTheme.SYSTEM) {
     val weeklyData = calculateWeeklyMoodData(entries)
     val entriesPerDay = weeklyData.entriesPerDay
 
@@ -255,7 +268,7 @@ fun MoodDistributionSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
             .fillMaxWidth()
             .padding(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDarkTheme) Color(0xFF2D2D2D) else MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
         )
     ) {
         Column(
@@ -265,7 +278,7 @@ fun MoodDistributionSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
                 text = "Entries Per Day",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -274,7 +287,7 @@ fun MoodDistributionSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
                 val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
                 val maxEntries = entriesPerDay.values.maxOrNull() ?: 1
 
-                // VERTICAL BARS - Changed from horizontal
+                // VERTICAL BARS
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -289,7 +302,7 @@ fun MoodDistributionSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
                     ) {
                         days.forEach { day ->
                             val count = entriesPerDay[day] ?: 0
-                            VerticalDayBar(day, count, maxEntries, isDarkTheme)
+                            VerticalDayBar(day, count, maxEntries, isDarkTheme, currentTheme)
                         }
                     }
 
@@ -303,7 +316,7 @@ fun MoodDistributionSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
                             Text(
                                 text = day,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isDarkTheme) Color(0xFFB0B0B0) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.Medium
                             )
                         }
@@ -313,7 +326,7 @@ fun MoodDistributionSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
                 Text(
                     text = "No data available for daily chart",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isDarkTheme) Color(0xFFB0B0B0) else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -321,7 +334,7 @@ fun MoodDistributionSection(entries: List<MoodEntry>, isDarkTheme: Boolean) {
 }
 
 @Composable
-fun VerticalDayBar(day: String, count: Int, maxCount: Int, isDarkTheme: Boolean) {
+fun VerticalDayBar(day: String, count: Int, maxCount: Int, isDarkTheme: Boolean, currentTheme: AppTheme = AppTheme.SYSTEM) {
     val barColor = MaterialTheme.colorScheme.secondary
     val barHeight = if (maxCount > 0) (count.toFloat() / maxCount.toFloat()) * 0.8f else 0f
 
@@ -335,20 +348,82 @@ fun VerticalDayBar(day: String, count: Int, maxCount: Int, isDarkTheme: Boolean)
             text = count.toString(),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 4.dp)
         )
 
         // Vertical bar
-        Box(
+        Card(
             modifier = Modifier
                 .width(25.dp)
-                .fillMaxHeight(barHeight)
-                .background(
-                    color = barColor,
-                    shape = MaterialTheme.shapes.small
-                )
+                .fillMaxHeight(barHeight),
+            colors = CardDefaults.cardColors(containerColor = barColor),
+            shape = MaterialTheme.shapes.small
+        ) {
+            // Empty content - just the colored bar
+        }
+    }
+}
+
+@Composable
+fun MostFrequentMoodSection(entries: List<MoodEntry>, isDarkTheme: Boolean, currentTheme: AppTheme = AppTheme.SYSTEM) {
+    val weeklyData = calculateWeeklyMoodData(entries)
+    val mostFrequentMood = weeklyData.mostFrequentMood
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
         )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Most Frequent Mood",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (mostFrequentMood != "No data") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    val (emoji, text) = getMoodEmoji(mostFrequentMood)
+                    Text(
+                        text = emoji,
+                        style = MaterialTheme.typography.headlineLarge,
+                        modifier = Modifier.padding(end = 16.dp)
+                    )
+                    Column {
+                        Text(
+                            text = text,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = getMoodTextColor(mostFrequentMood, isDarkTheme, currentTheme)
+                        )
+                        Text(
+                            text = "Your most common mood this week",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = "No mood data available",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

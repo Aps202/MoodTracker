@@ -1,231 +1,113 @@
 package com.abc.moodtracker.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.abc.moodtracker.viewmodel.MoodViewModel
 import com.abc.moodtracker.viewmodel.MoodViewModelFactory
+import kotlinx.coroutines.delay
 
-// Add these imports
-import androidx.compose.foundation.background
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    onNavigateToDetail: (Long) -> Unit,
-    onNavigateToWeeklyReport: () -> Unit,
     viewModelFactory: MoodViewModelFactory,
-    currentTheme: AppTheme,
-    onThemeChanged: (AppTheme) -> Unit,
     isDarkTheme: Boolean
 ) {
     val navController = rememberNavController()
     val viewModel: MoodViewModel = viewModel(factory = viewModelFactory)
 
-    // Check internet connection state
-    val connectionState by rememberConnectionState()
+    // Observe theme state
+    val currentTheme by viewModel.currentTheme.collectAsState()
 
-    // Show loading/error states
-    if (viewModel.isLoading.value) {
-        LoadingProgressBar(isLoading = true, isDarkTheme = isDarkTheme)
-    } else if (!connectionState.isConnected) {
-        ErrorDialog(
-            message = "No internet connection. Some features may be limited.",
-            onDismiss = { /* We'll keep showing this until connection returns */ },
-            isDarkTheme = isDarkTheme
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Add animated background to the entire main screen
+        AnimatedMoodBackground(
+            isDarkTheme = isDarkTheme,
+            modifier = Modifier.fillMaxSize()
         )
-    }
 
-    NavHost(navController = navController, startDestination = "main") {
-        composable("main") {
-            MainContentScreen(
-                viewModel = viewModel,
-                onNavigateToDetail = { entryId ->
-                    navController.navigate("detail/$entryId")
-                },
-                onNavigateToWeeklyReport = {
-                    navController.navigate("weekly")
-                },
-                currentTheme = currentTheme,
-                onThemeChanged = onThemeChanged,
-                isDarkTheme = isDarkTheme
-            )
-        }
-        composable("detail/{entryId}") { backStackEntry ->
-            val entryId = backStackEntry.arguments?.getString("entryId")?.toLongOrNull() ?: 0L
-            DetailScreen(
-                entryId = entryId,
-                onNavigateBack = { navController.popBackStack() },
-                viewModelFactory = viewModelFactory,
-                isDarkTheme = isDarkTheme
-            )
-        }
-        composable("weekly") {
-            WeeklyReportScreen(
-                onNavigateBack = { navController.popBackStack() },
-                viewModelFactory = viewModelFactory,
-                isDarkTheme = isDarkTheme
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)  // Added both experimental APIs
-@Composable
-fun MainContentScreen(
-    viewModel: MoodViewModel,
-    onNavigateToDetail: (Long) -> Unit,
-    onNavigateToWeeklyReport: () -> Unit,
-    currentTheme: AppTheme,
-    onThemeChanged: (AppTheme) -> Unit,
-    isDarkTheme: Boolean
-) {
-    val moodPrediction = remember(viewModel.moodEntries.value) {
-        predictNextMood(viewModel.moodEntries.value.map { it.mood })
-    }
-
-    val backgroundColor = if (isDarkTheme) Color(0xFF121212) else MaterialTheme.colorScheme.background
-    val pagerState = rememberPagerState(pageCount = { 2 })
-
-    // Animated floating moods background
-    AnimatedMoodBackground(isDarkTheme = isDarkTheme)
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "MoodTracker",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "MoodTracker",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold
+                            )
                         )
-                    )
-                },
-                actions = {
-                    IconButton(onClick = onNavigateToWeeklyReport) {
-                        Icon(Icons.Default.BarChart, "Weekly Report")
-                    }
+                    },
+                    actions = {
+                        // Theme switcher
+                        com.abc.moodtracker.ui.components.ThemeSwitcher(
+                            currentTheme = currentTheme,
+                            onThemeChanged = { newTheme ->
+                                viewModel.updateTheme(newTheme)
+                            },
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
 
-                    var showThemeDropdown by remember { mutableStateOf(false) }
-                    Box {
-                        IconButton(onClick = { showThemeDropdown = true }) {
-                            Icon(Icons.Default.Settings, "Theme Settings")
-                        }
-
-                        if (showThemeDropdown) {
-                            DropdownMenu(
-                                expanded = showThemeDropdown,
-                                onDismissRequest = { showThemeDropdown = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.LightMode, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                                            Text("Light Theme")
-                                        }
-                                    },
-                                    onClick = {
-                                        onThemeChanged(AppTheme.LIGHT)
-                                        showThemeDropdown = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.DarkMode, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                                            Text("Dark Theme")
-                                        }
-                                    },
-                                    onClick = {
-                                        onThemeChanged(AppTheme.DARK)
-                                        showThemeDropdown = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                                            Text("System Default")
-                                        }
-                                    },
-                                    onClick = {
-                                        onThemeChanged(AppTheme.SYSTEM)
-                                        showThemeDropdown = false
-                                    }
-                                )
-                            }
+                        // Weekly report button
+                        IconButton(onClick = {
+                            navController.navigate("weekly")
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.BarChart,
+                                contentDescription = "Weekly Report"
+                            )
                         }
                     }
-                }
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = {
-                    viewModel.addMoodEntry(moodPrediction.predictedMood)
-                },
-                icon = { Icon(Icons.Default.Add, "Quick Add") },
-                text = { Text("Add ${moodPrediction.predictedMood}") },
-                containerColor = getMoodColor(moodPrediction.predictedMood, isDarkTheme)
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            EnhancedThemeIndicator(currentTheme = currentTheme, isDarkTheme = isDarkTheme)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            HorizontalPager(state = pagerState) { page ->
-                when (page) {
-                    0 -> MoodTrackerContent(
+                )
+            },
+            containerColor = androidx.compose.ui.graphics.Color.Transparent
+        ) { paddingValues ->
+            NavHost(
+                navController = navController,
+                startDestination = "main",
+                modifier = Modifier.padding(paddingValues)
+            ) {
+                composable("main") {
+                    InteractiveMainContent(
                         viewModel = viewModel,
-                        moodPrediction = moodPrediction,
-                        onNavigateToDetail = onNavigateToDetail,
+                        onNavigateToDetail = { entryId ->
+                            navController.navigate("detail/$entryId")
+                        },
+                        currentTheme = currentTheme,
                         isDarkTheme = isDarkTheme
                     )
-                    1 -> WeeklyPreview(viewModel = viewModel, isDarkTheme = isDarkTheme)
                 }
-            }
-
-            // Page indicators
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                repeat(pagerState.pageCount) { index ->
-                    val color = if (pagerState.currentPage == index) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .padding(4.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(color)  // Now this will work
+                composable("detail/{entryId}") { backStackEntry ->
+                    val entryId = backStackEntry.arguments?.getString("entryId")?.toLongOrNull() ?: 0L
+                    DetailScreen(
+                        entryId = entryId,
+                        onNavigateBack = { navController.popBackStack() },
+                        viewModelFactory = viewModelFactory,
+                        isDarkTheme = isDarkTheme,
+                        currentTheme = currentTheme
+                    )
+                }
+                composable("weekly") {
+                    WeeklyReportScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        viewModelFactory = viewModelFactory,
+                        isDarkTheme = isDarkTheme,
+                        currentTheme = currentTheme
                     )
                 }
             }
@@ -234,243 +116,212 @@ fun MainContentScreen(
 }
 
 @Composable
-fun EnhancedThemeIndicator(currentTheme: AppTheme, isDarkTheme: Boolean) {
-    val (icon, text, color) = when (currentTheme) {
-        AppTheme.LIGHT -> Triple(Icons.Default.LightMode, "Light Mode", Color(0xFFFFB74D))
-        AppTheme.DARK -> Triple(Icons.Default.DarkMode, "Dark Mode", Color(0xFF7986CB))
-        AppTheme.SYSTEM -> Triple(Icons.Default.Settings, "System Theme", Color(0xFF81C784))
-        else -> Triple(Icons.Default.Settings, "Unknown", Color.Gray)
+fun InteractiveMainContent(
+    viewModel: MoodViewModel,
+    onNavigateToDetail: (Long) -> Unit,
+    currentTheme: AppTheme,
+    isDarkTheme: Boolean
+) {
+    val moodEntries by viewModel.moodEntries.collectAsState()
+
+    // State for interactive greeting
+    var showWelcome by remember { mutableStateOf(true) }
+    var currentGreetingIndex by remember { mutableStateOf(0) }
+    var pulseAnimation by remember { mutableStateOf(false) }
+    var recentlyLoggedMood by remember { mutableStateOf(false) }
+
+    val greetings = listOf(
+        "How are you feeling today? 🌟",
+        "What's your mood right now? 💫",
+        "How's your heart feeling? 💝",
+        "Ready to check in? 📝",
+        "Let's capture this moment! ✨"
+    )
+
+    // Auto-cycle through greetings when welcome is shown
+    LaunchedEffect(showWelcome) {
+        while (showWelcome) {
+            delay(4000) // Change greeting every 4 seconds
+            currentGreetingIndex = (currentGreetingIndex + 1) % greetings.size
+            pulseAnimation = true
+            delay(200)
+            pulseAnimation = false
+        }
     }
 
-    val backgroundColor = if (isDarkTheme) Color(0xFF2D2D2D) else color.copy(alpha = 0.1f)
+    // Reset welcome after mood logging
+    LaunchedEffect(recentlyLoggedMood) {
+        if (recentlyLoggedMood) {
+            delay(3000) // Wait 3 seconds
+            showWelcome = true
+            recentlyLoggedMood = false
+        }
+    }
 
-    Card(
+    // Pulse animation for the greeting
+    val greetingAlpha by animateFloatAsState(
+        targetValue = if (pulseAnimation) 0.7f else 1f,
+        animationSpec = tween(durationMillis = 500),
+        label = "greeting_pulse"
+    )
+
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
+            .fillMaxSize()
+            .padding(16.dp)
     ) {
-        Row(
+        // Interactive Greeting Section
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, null, tint = color, modifier = Modifier.padding(end = 8.dp))
-            Text(
-                text = "Current: $text",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-// Main content that was probably in your original MainScreen
-@Composable
-fun MoodTrackerContent(
-    viewModel: MoodViewModel,
-    moodPrediction: MoodPrediction,
-    onNavigateToDetail: (Long) -> Unit,
-    isDarkTheme: Boolean
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        PredictionCard(moodPrediction, isDarkTheme)
-        Spacer(modifier = Modifier.height(16.dp))
-        EnhancedMoodSelectorSection(viewModel, isDarkTheme)
-        Spacer(modifier = Modifier.height(24.dp))
-        EnhancedMoodHistorySection(viewModel, onNavigateToDetail, isDarkTheme)
-    }
-}
-
-@Composable
-private fun PredictionCard(moodPrediction: MoodPrediction, isDarkTheme: Boolean) {
-    val surfaceVariantColor = if (isDarkTheme) Color(0xFF2D2D2D) else MaterialTheme.colorScheme.surfaceVariant
-    val onSurfaceVariantColor = if (isDarkTheme) Color(0xFFB0B0B0) else MaterialTheme.colorScheme.onSurfaceVariant
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = surfaceVariantColor
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = "Mood Prediction",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Next mood likely: ${moodPrediction.predictedMood}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = onSurfaceVariantColor
-            )
-        }
-    }
-}
-
-@Composable
-private fun EnhancedMoodSelectorSection(
-    viewModel: MoodViewModel,
-    isDarkTheme: Boolean
-) {
-    val onSurfaceColor = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "How are you feeling?",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 16.dp),
-            color = onSurfaceColor
-        )
-
-        // Use your existing MoodSelector component
-        com.abc.moodtracker.ui.components.MoodSelector(
-            availableMoods = viewModel.availableMoods,
-            onMoodSelected = { mood -> viewModel.addMoodEntry(mood) },
-            modifier = Modifier.fillMaxWidth(),
-            isDarkTheme = isDarkTheme
-        )
-    }
-}
-
-@Composable
-private fun EnhancedMoodHistorySection(
-    viewModel: MoodViewModel,
-    onNavigateToDetail: (Long) -> Unit,
-    isDarkTheme: Boolean
-) {
-    val onSurfaceColor = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = "Recent Moods",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 8.dp),
-            color = onSurfaceColor
-        )
-
-        if (viewModel.moodEntries.value.isEmpty()) {
-            EmptyState(isDarkTheme = isDarkTheme)
-        } else {
-            // Use your existing MoodHistory component
-            com.abc.moodtracker.ui.components.MoodHistory(
-                moodEntries = viewModel.moodEntries.value.take(10),
-                onNavigateToDetail = onNavigateToDetail,
-                onDeleteEntry = { entry -> viewModel.deleteMoodEntry(entry) },
-                modifier = Modifier.fillMaxWidth(),
-                isDarkTheme = isDarkTheme
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmptyState(isDarkTheme: Boolean) {
-    val onSurfaceColor = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-    val onSurfaceVariantColor = if (isDarkTheme) Color(0xFFB0B0B0) else MaterialTheme.colorScheme.onSurfaceVariant
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "📊",
-            style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        Text(
-            text = "No moods logged yet",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 8.dp),
-            color = onSurfaceColor
-        )
-        Text(
-            text = "How are you feeling today? Select a mood above to get started!",
-            style = MaterialTheme.typography.bodyMedium,
-            color = onSurfaceVariantColor
-        )
-    }
-}
-
-@Composable
-fun WeeklyPreview(viewModel: MoodViewModel, isDarkTheme: Boolean) {
-    val backgroundColor = if (isDarkTheme) Color(0xFF121212) else MaterialTheme.colorScheme.background
-    val surfaceColor = if (isDarkTheme) Color(0xFF1E1E1E) else MaterialTheme.colorScheme.surface
-    val onSurfaceColor = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-    val onSurfaceVariantColor = if (isDarkTheme) Color(0xFFB0B0B0) else MaterialTheme.colorScheme.onSurfaceVariant
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .background(backgroundColor)  // Now this will work
-    ) {
-        Text(
-            text = "Weekly Overview",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(bottom = 16.dp),
-            color = onSurfaceColor
-        )
-
-        val stats = calculateWeeklyStats(viewModel.moodEntries.value)
-        Card(
-            modifier = Modifier.fillMaxWidth(),
+                .padding(bottom = 20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = surfaceColor
-            )
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Animated greeting text
                 Text(
-                    text = "This Week",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = onSurfaceColor
+                    text = greetings[currentGreetingIndex],
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 22.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .alpha(greetingAlpha)
+                        .padding(bottom = 8.dp)
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    StatItemFixed("Total", stats.total.toString(), isDarkTheme)
-                    StatItemFixed("Happy", stats.happyCount.toString(), isDarkTheme)
-                    StatItemFixed("Avg", stats.averageMood, isDarkTheme)
+
+                // Subtitle with emoji
+                Text(
+                    text = "Tap a mood below to get started! 🎯",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center
+                )
+
+                // Quick stats if there are entries
+                if (moodEntries.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "📊 You've logged ${moodEntries.size} mood${if (moodEntries.size != 1) "s" else ""} so far!",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun StatItemFixed(label: String, value: String, isDarkTheme: Boolean) {
-    val onSurfaceColor = if (isDarkTheme) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-    val onSurfaceVariantColor = if (isDarkTheme) Color(0xFFB0B0B0) else MaterialTheme.colorScheme.onSurfaceVariant
+        // Mood Selector
+        com.abc.moodtracker.ui.components.MoodSelector(
+            availableMoods = viewModel.availableMoods,
+            selectedMood = null,
+            onMoodSelected = { mood ->
+                println("UI: Mood selector clicked - $mood")
+                viewModel.addMoodEntry(mood)
+                // Show feedback that mood was logged
+                showWelcome = false
+                recentlyLoggedMood = true
+            },
+            modifier = Modifier.fillMaxWidth(),
+            isDarkTheme = isDarkTheme,
+            currentTheme = currentTheme
+        )
 
-    Column(
-        modifier = Modifier.fillMaxWidth(0.33f),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = onSurfaceVariantColor
-        )
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Mood History with enhanced header
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Enhanced history header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "📋 Your Mood Journey",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Entry count badge
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Text(
+                            text = "${moodEntries.size}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                com.abc.moodtracker.ui.components.MoodHistory(
+                    moodEntries = moodEntries,
+                    onNavigateToDetail = onNavigateToDetail,
+                    onDeleteEntry = { entry ->
+                        println("UI: Delete entry clicked - ${entry.mood}")
+                        viewModel.deleteMoodEntry(entry)
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    isDarkTheme = isDarkTheme,
+                    currentTheme = currentTheme
+                )
+            }
+        }
+
+        // Quick tip at the bottom (only shows when there are few entries)
+        if (moodEntries.size < 3) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Tip",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Tip: Log your mood daily to track patterns!",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+        }
     }
 }

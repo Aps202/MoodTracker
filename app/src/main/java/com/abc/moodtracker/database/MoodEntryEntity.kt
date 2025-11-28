@@ -14,3 +14,11 @@ data class MoodEntryEntity(
     val timestamp: String = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date()),
     val notes: String = ""
 )
+
+// Add UserPreferences Entity to the same file
+@Entity(tableName = "user_preferences")
+data class UserPreferences(
+    @PrimaryKey
+    val id: Int = 1, // Single row for preferences
+    val theme: String = "SYSTEM" // "LIGHT", "DARK", "SYSTEM"
+)

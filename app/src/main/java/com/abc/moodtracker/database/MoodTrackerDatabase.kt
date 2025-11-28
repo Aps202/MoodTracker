@@ -6,12 +6,13 @@ import androidx.room.RoomDatabase
 import android.content.Context
 
 @Database(
-    entities = [MoodEntryEntity::class],
-    version = 2,
+    entities = [MoodEntryEntity::class, UserPreferences::class], // Fixed: Use the correct entity classes from this package
+    version = 3,
     exportSchema = false
 )
 abstract class MoodTrackerDatabase : RoomDatabase() {
     abstract fun moodEntryDao(): MoodEntryDao
+    abstract fun userPreferencesDao(): UserPreferencesDao
 
     companion object {
         @Volatile
